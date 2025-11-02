@@ -10,7 +10,7 @@ Java based application that serves batch image conversion to PDF.
 - Drag and drop suppport.
 
 ## How to Use
-1. Go to the release page of this repository.
+1. Go to the [release page](https://github.com/ZeynTheDev/ZeynConverter/releases) of this repository.
 2. Download the latest version of installer.
 3. Run the installer.
 
