@@ -26,6 +26,7 @@ Java based application that serves batch image conversion to PDF.
     java -jar ZeynConverter-<version>.jar
     # change the <version> as the version number you downloaded (e.g. 0.1.5)
     ```
+* Java environment configuration documentation can be read here: [Eclipse Temurin Documentation](https://adoptium.net/installation/linux/)
 
 ### 🍎 For macOS 
 > The native installer (`.dmg`) is not available yet. This is planned for a future release.
