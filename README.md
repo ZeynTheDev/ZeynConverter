@@ -11,8 +11,26 @@ Java based application that serves batch image conversion to PDF.
 
 ## How to Use
 1. Go to the [release page](https://github.com/ZeynTheDev/ZeynConverter/releases) of this repository.
-2. Download the latest version of installer.
-3. Run the installer.
+2. Find the latest release (e.g., `v0.1.0`).
+3. Based on your operating system, follow the steps below:
+
+### 🖥️ For Windows Users
+* Download the `.exe` file (e.g., `Zeyn Converter-0.1.0.exe`).
+* Run the installer. It will automatically create desktop and Start Menu shortcuts.
+
+### 🐧 For Linux Users
+* Download the `.jar` file (e.g., `ZeynConverter-0.1.0.jar`).
+* Make sure you have **Java Runtime Environment (JRE)** installed. You can get it from [Adoptium (OpenJDK)](https://adoptium.net/) or [Oracle](https://www.oracle.com/java/technologies/downloads/).
+* Open your terminal, navigate to the download folder, and run:
+    ```bash
+    java -jar ZeynConverter-<version>.jar
+    # change the <version> as the version number you downloaded (e.g. 0.1.5)
+    ```
+
+### 🍎 For macOS 
+> The native installer (`.dmg`) is not available yet. This is planned for a future release.
+* Follow the **exact same instructions** as the "For Linux Users" section.
+* You only need the `.jar` file and a Java Runtime Environment (JRE).
 
 ## Development Plan
 - Configuring WebP (`.webp`) support.
