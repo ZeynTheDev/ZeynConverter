@@ -3,6 +3,8 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/GUIForms/JFrame.java to edit this template
  */
 package com.mycompany.zeynconverter;
+import com.mycompany.zeynconverter.core.PreferencesService;
+
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.io.File;
@@ -36,6 +38,9 @@ public class MainFrame extends javax.swing.JFrame {
     private File outputFolder;
     private javax.swing.JLabel emptyListLabel;
     
+    //prefs service instance
+    private final PreferencesService prefsService = new PreferencesService();
+    
     /**
      * Creates new form MainFrame
      */
@@ -43,19 +48,19 @@ public class MainFrame extends javax.swing.JFrame {
         initComponents();
         setLocationRelativeTo(null);
         listDisplay.setModel(listModel);
-        pathTxtArea.setEditable(false); 
+        pathTxtArea.setEditable(false);
+        pathTxtArea.setLineWrap(true); //make the text wrapped
+        pathTxtArea.setWrapStyleWord(true); //make the word wouldn't be cutten
         outputTxtField.setEditable(false);
         //show a friendly warn that there's still nothing added
         emptyListLabel = new javax.swing.JLabel("You are not added anything here :/");
         emptyListLabel.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         emptyListLabel.setForeground(java.awt.Color.GRAY);
         
-        //get the default user "My Documents" directory
-        File defaultDocsFolder = FileSystemView.getFileSystemView().getDefaultDirectory();
-        //saving as the default directory
-        this.outputFolder = defaultDocsFolder;
-        //show the directory on the text field
-        outputTxtField.setText(this.outputFolder.getAbsolutePath());
+        //load the path from prefs service
+        String savedPath = prefsService.loadPath();
+        this.outputFolder = new File(savedPath);
+        outputTxtField.setText(savedPath);
         
         listDisplay.setTransferHandler(fileDragHandler);
         emptyListLabel.setTransferHandler(fileDragHandler);
@@ -466,6 +471,9 @@ public class MainFrame extends javax.swing.JFrame {
             
             //show the path on text field
             outputTxtField.setText(this.outputFolder.getAbsolutePath());
+            
+            //saving on prefs service
+            prefsService.savePath(this.outputFolder.getAbsolutePath());
         }
     }//GEN-LAST:event_outputSetBtnActionPerformed
 
@@ -502,6 +510,14 @@ public class MainFrame extends javax.swing.JFrame {
             java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
         }
         //</editor-fold>
+        try {
+            // set look and feel to be like OS native view
+            javax.swing.UIManager.setLookAndFeel(
+                javax.swing.UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ex) {
+            java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(
+                java.util.logging.Level.SEVERE, null, ex);
+        }
 
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
