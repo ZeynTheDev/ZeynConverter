@@ -4,28 +4,20 @@
  */
 package com.mycompany.zeynconverter;
 import com.mycompany.zeynconverter.core.PreferencesService;
+import com.mycompany.zeynconverter.conversion.ImgToPdfConverter;
+import com.mycompany.zeynconverter.core.ListService;
+import com.mycompany.zeynconverter.ui.FileDragHandler;
+import java.awt.Desktop;
 
-import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.Transferable;
 import java.io.File;
-import java.util.ArrayList;
+import java.io.IOException;
 import java.util.List;
-import java.util.Arrays;
 import javax.swing.DefaultListModel;
 import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileNameExtensionFilter;
-import javax.swing.filechooser.FileSystemView;
 import javax.swing.JOptionPane;
-import javax.swing.TransferHandler;
-import javax.swing.SwingWorker;
-import static javax.swing.TransferHandler.COPY;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.event.ListSelectionEvent;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 /**
  *
  * @author Zeyn
@@ -33,18 +25,18 @@ import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 public class MainFrame extends javax.swing.JFrame {
 
     //saving file data
-    private List<File> conversionList = new ArrayList<>();
     private DefaultListModel<String> listModel = new DefaultListModel<>();
     private File outputFolder;
     private javax.swing.JLabel emptyListLabel;
     
     //prefs service instance
     private final PreferencesService prefsService = new PreferencesService();
+    private final ListService listService = new ListService();
     
     /**
      * Creates new form MainFrame
      */
-    public MainFrame() {    
+    public MainFrame() {
         initComponents();
         setLocationRelativeTo(null);
         listDisplay.setModel(listModel);
@@ -62,27 +54,30 @@ public class MainFrame extends javax.swing.JFrame {
         this.outputFolder = new File(savedPath);
         outputTxtField.setText(savedPath);
         
-        listDisplay.setTransferHandler(fileDragHandler);
-        emptyListLabel.setTransferHandler(fileDragHandler);
+        FileDragHandler dragHandler = new FileDragHandler(listService, this);
+        listDisplay.setTransferHandler(dragHandler);
+        emptyListLabel.setTransferHandler(dragHandler);
         
         
         //GUI list selection listener
         listDisplay.addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent e) {
-                // Cek apakah perubahan sudah "final" dan ada item yang dipilih
+                // check is the change is "final" and is there something selected or not
                 if (!e.getValueIsAdjusting()) {
                     int index = listDisplay.getSelectedIndex();
 
                     if (index != -1) {
-                        // Ada item yang dipilih
-                        // Ambil File dari "otak" data kita
-                        File choosenFile = conversionList.get(index);
-                        // Tampilkan path lengkapnya di pathTxtArea
-                        pathTxtArea.setText(choosenFile.getAbsolutePath());
+                        // There's selected item
+                        // get the file from service
+                        File choosenFile = listService.getFileAt(index);
+                        // show the full path on pathTxtArea
+                        if (choosenFile != null){
+                            pathTxtArea.setText(choosenFile.getAbsolutePath());
+                        }
                     } else {
-                        // Tidak ada item yang dipilih (misal setelah dihapus)
-                        pathTxtArea.setText(""); // Kosongkan
+                        // There's nothing selected (i.e. after deleted)
+                        pathTxtArea.setText(""); // clearing pathTxtArea
                     }
                 }
             }
@@ -120,6 +115,8 @@ public class MainFrame extends javax.swing.JFrame {
         progressBar = new javax.swing.JProgressBar();
         devNote = new javax.swing.JLabel();
         btnClearList = new javax.swing.JButton();
+        cbLossless = new javax.swing.JCheckBox();
+        btnOpenFolderOutput = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -178,14 +175,15 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
 
-        supportedInfo.setText("*Curently Supported Format: only JPG (.jpg/.jpeg) and PNG (.png)");
+        supportedInfo.setText("*Curently Supported Format: only JPG (.jpg/.jpeg), PNG (.png), and WebP (.webp)");
 
         outputLabel.setText("Output Folder");
 
         outputTxtField.setEditable(false);
         outputTxtField.setText("<<Null>>");
 
-        outputSetBtn.setText("Set Folder");
+        outputSetBtn.setIcon(new javax.swing.ImageIcon("E:\\code_project\\ZeynConverter\\src\\main\\resources\\icons\\create_new_folder_24dp_000000.png")); // NOI18N
+        outputSetBtn.setToolTipText("Set Output Folder");
         outputSetBtn.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 outputSetBtnActionPerformed(evt);
@@ -197,12 +195,24 @@ public class MainFrame extends javax.swing.JFrame {
         progressBar.setForeground(new java.awt.Color(89, 168, 75));
         progressBar.setStringPainted(true);
 
-        devNote.setText("(Currently, you may able to add WebP (.webp) files but it still won't work. The development on it under progress.)");
+        devNote.setText("*On Future Plan Development: SVG (.svg), Bitmap (.bmp, .cur, .ico)");
 
         btnClearList.setText("Clear List");
         btnClearList.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnClearListActionPerformed(evt);
+            }
+        });
+
+        cbLossless.setBackground(new java.awt.Color(255, 255, 255));
+        cbLossless.setText("Lossless (Size Bigger, Maintain Pixel)");
+        cbLossless.setToolTipText("Maintains 100% image quality. Suggested if file size is not a concern.");
+
+        btnOpenFolderOutput.setIcon(new javax.swing.ImageIcon("E:\\code_project\\ZeynConverter\\src\\main\\resources\\icons\\folder_open_24dp_000000.png")); // NOI18N
+        btnOpenFolderOutput.setToolTipText("Open Output Folder");
+        btnOpenFolderOutput.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnOpenFolderOutputActionPerformed(evt);
             }
         });
 
@@ -213,41 +223,61 @@ public class MainFrame extends javax.swing.JFrame {
             .addGroup(jPanel1Layout.createSequentialGroup()
                 .addGap(26, 26, 26)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(devNote)
-                    .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                        .addGroup(jPanel1Layout.createSequentialGroup()
-                            .addGap(125, 125, 125)
-                            .addComponent(appTitle, javax.swing.GroupLayout.PREFERRED_SIZE, 338, javax.swing.GroupLayout.PREFERRED_SIZE))
-                        .addComponent(supportedInfo)
-                        .addGroup(jPanel1Layout.createSequentialGroup()
-                            .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                .addComponent(outputLabel)
-                                .addGroup(jPanel1Layout.createSequentialGroup()
-                                    .addComponent(outputTxtField, javax.swing.GroupLayout.PREFERRED_SIZE, 256, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                    .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                    .addComponent(outputSetBtn))
-                                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 327, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                            .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                    .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                    .addComponent(pathLabel)
-                                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
-                                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                            .addComponent(upBtn)
-                                            .addComponent(downBtn))
-                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                                            .addComponent(addFileBtn, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                            .addComponent(deleteFileBtn, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                            .addComponent(btnClearList, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
-                                .addComponent(convertBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 174, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                        .addComponent(progressBar, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(progressBar, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addComponent(devNote)
+                                    .addComponent(supportedInfo))
+                                .addGap(0, 0, Short.MAX_VALUE)))
+                        .addContainerGap())
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(outputLabel)
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 327, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addComponent(upBtn)
+                                    .addComponent(downBtn)))
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addComponent(outputTxtField, javax.swing.GroupLayout.PREFERRED_SIZE, 256, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                .addComponent(outputSetBtn)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(btnOpenFolderOutput))
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addGap(304, 304, 304)
+                                .addComponent(progressLabel)))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 23, Short.MAX_VALUE)
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                                    .addComponent(cbLossless)
+                                    .addGroup(jPanel1Layout.createSequentialGroup()
+                                        .addComponent(convertBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 174, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addGap(14, 14, 14)))
+                                .addGap(15, 15, 15))
+                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                                .addComponent(addFileBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 113, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addContainerGap())
+                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                                .addComponent(deleteFileBtn)
+                                .addContainerGap())
+                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                                .addComponent(btnClearList, javax.swing.GroupLayout.PREFERRED_SIZE, 113, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addContainerGap())
+                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                                .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 267, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addContainerGap())
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addComponent(pathLabel)
+                                .addContainerGap())))))
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(progressLabel)
-                .addGap(284, 284, 284))
+                .addComponent(appTitle, javax.swing.GroupLayout.PREFERRED_SIZE, 338, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(148, 148, 148))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -257,38 +287,47 @@ public class MainFrame extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(jPanel1Layout.createSequentialGroup()
-                        .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 262, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(18, 18, 18)
-                        .addComponent(outputLabel)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(outputTxtField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(outputSetBtn)))
-                    .addGroup(jPanel1Layout.createSequentialGroup()
                         .addComponent(pathLabel)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(18, 18, 18)
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(addFileBtn)
-                            .addComponent(upBtn))
+                        .addComponent(addFileBtn)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                            .addComponent(deleteFileBtn)
-                            .addComponent(downBtn))
+                        .addComponent(deleteFileBtn)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(btnClearList)
-                        .addGap(58, 58, 58)
-                        .addComponent(convertBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 76, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addGap(18, 18, 18)
-                .addComponent(progressLabel)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addGap(44, 44, 44)
+                        .addComponent(convertBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 76, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(cbLossless)
+                        .addGap(0, 8, Short.MAX_VALUE))
+                    .addGroup(jPanel1Layout.createSequentialGroup()
+                        .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 262, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(18, 18, 18)
+                                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                                    .addGroup(jPanel1Layout.createSequentialGroup()
+                                        .addComponent(outputLabel)
+                                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                                        .addComponent(outputTxtField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                    .addComponent(outputSetBtn)
+                                    .addComponent(btnOpenFolderOutput))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addGap(0, 0, Short.MAX_VALUE)
+                                .addComponent(upBtn)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(downBtn)
+                                .addGap(167, 167, 167)))
+                        .addComponent(progressLabel)))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(progressBar, javax.swing.GroupLayout.PREFERRED_SIZE, 12, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(supportedInfo)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(devNote)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(22, Short.MAX_VALUE))
         );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -305,184 +344,165 @@ public class MainFrame extends javax.swing.JFrame {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    private void addFileBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addFileBtnActionPerformed
+    private void btnOpenFolderOutputActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnOpenFolderOutputActionPerformed
         // TODO add your handling code here:
-        JFileChooser fileChooser = new JFileChooser();
-        
-        fileChooser.setMultiSelectionEnabled(true);
-        
-        FileNameExtensionFilter filter = new FileNameExtensionFilter(
-        "Gambar (JPG, PNG, WebP)", "jpg", "jpeg", "png", "webp");
-        fileChooser.setFileFilter(filter);
-        
-        int result = fileChooser.showOpenDialog(this);
-        
-        if (result == JFileChooser.APPROVE_OPTION){
-            File[] files = fileChooser.getSelectedFiles();
-            
-            for (File file : files){
-                conversionList.add(file);
-                listModel.addElement(file.getName());
-            }
-            updateListView();
-        }
-    }//GEN-LAST:event_addFileBtnActionPerformed
-
-    private void deleteFileBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteFileBtnActionPerformed
-        // TODO add your handling code here:
-        //get all selected files
-        int[] selectedIndices = listDisplay.getSelectedIndices();
-        
-        for (int i = selectedIndices.length -1; i>=0; i--){
-            //get the index of selected files
-            int index = selectedIndices[i];
-            
-            //removing from array list
-            conversionList.remove(index);
-            
-            //removing selected files from GUI list
-            listModel.remove(index);
-        }
-        updateListView();
-    }//GEN-LAST:event_deleteFileBtnActionPerformed
-
-    private void upBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_upBtnActionPerformed
-        // TODO add your handling code here:
-        //getting the selected index
-        int index = listDisplay.getSelectedIndex();
-        
-        //checking is there a selected item or not
-        if (index > 0) {
-            //--- moving the data on the array list ---
-            
-            //get the file, then delete it from the current position
-            File file = conversionList.remove(index);
-            // insert it on a step above
-            conversionList.add(index - 1, file);
-            
-            //--- moving the data on GUI list ---
-            
-            //get the file name and removing it from the current position
-            String fileName = listModel.remove(index);
-            
-            // insert it on a step above
-            listModel.add(index - 1, fileName);
-            
-            //keep the selection on the item while it was moved
-            listDisplay.setSelectedIndex(index - 1);
-        }
-    }//GEN-LAST:event_upBtnActionPerformed
-
-    private void downBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_downBtnActionPerformed
-        // TODO add your handling code here:
-        //getting the selected index
-        int index = listDisplay.getSelectedIndex();
-        
-        //checking is the selected was on the bottom and existed
-        if (index != -1 && index < listModel.getSize() - 1) {
-            //--- moving the data on the array list ---
-            
-            //get the file, then delete it from the current position
-            File file = conversionList.remove(index);
-            //insert on a step below
-            conversionList.add(index + 1, file);
-            
-             //--- moving the data on GUI list ---
-            
-            //get the file name and removing it from the current position
-            String fileName = listModel.remove(index);
-            //insert on a step below
-            listModel.add(index + 1, fileName);
-            
-            //keep the selection on the item while it was moved
-            listDisplay.setSelectedIndex(index + 1);
-        }
-    }//GEN-LAST:event_downBtnActionPerformed
-
-    private void convertBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_convertBtnActionPerformed
-        // TODO add your handling code here:
-        
-        //checking is the list is empty or not
-        if (conversionList.isEmpty()){
-            JOptionPane.showMessageDialog(
+        try {
+            if(this.outputFolder != null && this.outputFolder.exists()) {
+                Desktop.getDesktop().open(this.outputFolder);
+            } else {
+                JOptionPane.showMessageDialog(
                     this,
-                    "You are not yet add anything here :/", 
-                    "List is Empty",
-                    JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        
-        //saving the file use JFileChooser
-        JFileChooser saveChooser = new JFileChooser();
-        saveChooser.setDialogTitle("Save PDF as...");
-        saveChooser.setFileFilter(new FileNameExtensionFilter("PDF Document", "pdf"));
-        
-        //check is the output folder was set or not
-        if(this.outputFolder != null){
-            saveChooser.setCurrentDirectory(this.outputFolder);
-        }
-        
-        int userSelection = saveChooser.showSaveDialog(this);
-        
-        //is user select "Save", not "Cancel"?
-        if (userSelection == JFileChooser.APPROVE_OPTION){
-            File fileToSave = saveChooser.getSelectedFile();
-            
-            //validating file name to ended with .pdf and its path
-            String goalPath = fileToSave.getAbsolutePath();
-            if(!goalPath.toLowerCase().endsWith(".pdf")){
-                goalPath += ".pdf";
+                    "Output folder is not set or does not exist.",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
             }
-            
-            //--- CONVERSION PROCESS---
-            
-            //disabling all features
-            convertBtn.setEnabled(false);
-            addFileBtn.setEnabled(false);
-            deleteFileBtn.setEnabled(false);
-            upBtn.setEnabled(false);
-            downBtn.setEnabled(false);
-            outputSetBtn.setEnabled(false);
-            listDisplay.setEnabled(false);
-            btnClearList.setEnabled(false);
-            
-            //execute the converter method
-            PdfConverterWorker worker = new PdfConverterWorker(conversionList, goalPath);
-            worker.execute();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(
+                this,
+                "Could not open folder: \n" + ex.getMessage(),
+                "Error",
+                JOptionPane.ERROR_MESSAGE);
         }
-    }//GEN-LAST:event_convertBtnActionPerformed
+    }//GEN-LAST:event_btnOpenFolderOutputActionPerformed
+
+    private void btnClearListActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearListActionPerformed
+        // TODO add your handling code here:
+        listService.clearList();
+        updateListView();
+    }//GEN-LAST:event_btnClearListActionPerformed
 
     private void outputSetBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_outputSetBtnActionPerformed
         // TODO add your handling code here:
         JFileChooser outputChooser = new JFileChooser();
-        
+
         //set that JFileChooser only able to choose folder
         outputChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
         outputChooser.setDialogTitle("Choose Output Folder");
-        
+
         int result = outputChooser.showOpenDialog(this);
-        
+
         if (result == JFileChooser.APPROVE_OPTION){
             //get the folder
             File selectedFolder = outputChooser.getSelectedFile();
-            
+
             //save on outputFolder
             this.outputFolder = selectedFolder;
-            
+
             //show the path on text field
             outputTxtField.setText(this.outputFolder.getAbsolutePath());
-            
+
             //saving on prefs service
             prefsService.savePath(this.outputFolder.getAbsolutePath());
         }
     }//GEN-LAST:event_outputSetBtnActionPerformed
 
-    private void btnClearListActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearListActionPerformed
+    private void convertBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_convertBtnActionPerformed
         // TODO add your handling code here:
-        conversionList.clear();
-        listModel.clear();
+
+        //checking is the list is empty or not
+        if (listService.isEmpty()){
+            JOptionPane.showMessageDialog(
+                this,
+                "You are not yet add anything here :/",
+                "List is Empty",
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        //saving the file use JFileChooser
+        JFileChooser saveChooser = new JFileChooser();
+        saveChooser.setDialogTitle("Save PDF as...");
+        saveChooser.setFileFilter(new FileNameExtensionFilter("PDF Document", "pdf"));
+
+        //check is the output folder was set or not
+        if(this.outputFolder != null){
+            saveChooser.setCurrentDirectory(this.outputFolder);
+        }
+
+        int userSelection = saveChooser.showSaveDialog(this);
+
+        //is user select "Save", not "Cancel"?
+        if (userSelection == JFileChooser.APPROVE_OPTION){
+            File fileToSave = saveChooser.getSelectedFile();
+
+            //validating file name to ended with .pdf and its path
+            String goalPath = fileToSave.getAbsolutePath();
+            if(!goalPath.toLowerCase().endsWith(".pdf")){
+                goalPath += ".pdf";
+            }
+
+            //--- CONVERSION PROCESS---
+
+            //getting the lossy/lossless confirmation
+            boolean useLossless = cbLossless.isSelected();
+
+            //disabling all features
+            setUIEnabled(false);
+
+            //execute the converter method
+            ImgToPdfConverter convert = new ImgToPdfConverter(
+                listService.getFiles(),
+                goalPath,
+                this,
+                progressBar,
+                useLossless);
+            convert.execute();
+        }
+    }//GEN-LAST:event_convertBtnActionPerformed
+
+    private void downBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_downBtnActionPerformed
+        // TODO add your handling code here:
+        //getting the selected index
+        int index = listDisplay.getSelectedIndex();
+
+        listService.moveDown(index);
+
         updateListView();
-    }//GEN-LAST:event_btnClearListActionPerformed
+
+        listDisplay.setSelectedIndex(index + 1);
+    }//GEN-LAST:event_downBtnActionPerformed
+
+    private void upBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_upBtnActionPerformed
+        // TODO add your handling code here:
+        //getting the selected index
+        int index = listDisplay.getSelectedIndex();
+
+        listService.moveUp(index);
+
+        updateListView();
+
+        listDisplay.setSelectedIndex(index - 1);
+    }//GEN-LAST:event_upBtnActionPerformed
+
+    private void deleteFileBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteFileBtnActionPerformed
+        // TODO add your handling code here:
+        //get all selected files
+        int[] selectedIndices = listDisplay.getSelectedIndices();
+
+        listService.removeIndices(selectedIndices);
+        updateListView();
+    }//GEN-LAST:event_deleteFileBtnActionPerformed
+
+    private void addFileBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addFileBtnActionPerformed
+        // TODO add your handling code here:
+        JFileChooser fileChooser = new JFileChooser();
+
+        fileChooser.setMultiSelectionEnabled(true);
+
+        FileNameExtensionFilter filter = new FileNameExtensionFilter(
+            "Gambar (JPG, PNG, WebP)", "jpg", "jpeg", "png", "webp");
+        fileChooser.setFileFilter(filter);
+
+        int result = fileChooser.showOpenDialog(this);
+
+        if (result == JFileChooser.APPROVE_OPTION){
+            File[] files = fileChooser.getSelectedFiles();
+
+            listService.addFiles(files);
+            updateListView();
+        }
+    }//GEN-LAST:event_addFileBtnActionPerformed
 
     /**
      * @param args the command line arguments
@@ -531,6 +551,8 @@ public class MainFrame extends javax.swing.JFrame {
     private javax.swing.JButton addFileBtn;
     private javax.swing.JLabel appTitle;
     private javax.swing.JButton btnClearList;
+    private javax.swing.JButton btnOpenFolderOutput;
+    private javax.swing.JCheckBox cbLossless;
     private javax.swing.JButton convertBtn;
     private javax.swing.JButton deleteFileBtn;
     private javax.swing.JLabel devNote;
@@ -549,160 +571,31 @@ public class MainFrame extends javax.swing.JFrame {
     private javax.swing.JLabel supportedInfo;
     private javax.swing.JButton upBtn;
     // End of variables declaration//GEN-END:variables
-
-    //--- Drag and Drop Logic ---
-    TransferHandler fileDragHandler = new TransferHandler(){
-            @Override
-            public boolean canImport(TransferHandler.TransferSupport support){
-                //check is the dragged data was a "file list" or not
-                if(!support.isDataFlavorSupported(DataFlavor.javaFileListFlavor)){
-                    return false;
-                }
-                
-                //tell OS to show "copy" icon
-                support.setDropAction(COPY);
-                return true;
-            }
-            
-            @Override
-            public boolean importData(TransferHandler.TransferSupport support){
-                if(!canImport(support)){
-                    return false;
-                }
-                
-                Transferable t = support.getTransferable();
-                
-                try{
-                    java.util.List<File> files = (java.util.List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
-                    
-                    for (File file : files){
-                        String name = file.getName().toLowerCase();
-                        
-                        if (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp")){
-                            if (!conversionList.contains(file)) {
-                                conversionList.add(file);
-                                listModel.addElement(file.getName());
-                            }
-                        }
-                    }
-                    updateListView();
-                    return true;
-                }catch (java.awt.datatransfer.UnsupportedFlavorException | java.io.IOException e){
-                    e.printStackTrace();
-                }
-                return false;
-            }
-    };
     
-    private void updateListView() {
+    public void updateListView() {
+        //clear old data from GUI
+        listModel.clear();
+        //get new data from service
+        List<String> fileNames = listService.getFileNames();
+        //input the new data on GUI
+        listModel.addAll(fileNames);
+        //show empty list if there's none
         if (listModel.isEmpty()) {
-            // Jika list kosong, tampilkan label di dalam scroll pane
             jScrollPane2.setViewportView(emptyListLabel);
         } else {
-            // Jika ada isi, tampilkan list
             jScrollPane2.setViewportView(listDisplay);
         }
     }
-    
-class PdfConverterWorker extends javax.swing.SwingWorker<String, Integer> {
 
-    private List<File> filesToConvert;
-    private String outputPath;
-
-    // 1. Konstruktor: Terima data yang dibutuhkan dari thread utama
-    public PdfConverterWorker(List<File> files, String path) {
-        // Buat salinan list agar aman dari perubahan
-        this.filesToConvert = new ArrayList<>(files); 
-        this.outputPath = path;
+    public void setUIEnabled(boolean enabled){
+        convertBtn.setEnabled(enabled);
+        addFileBtn.setEnabled(enabled);
+        deleteFileBtn.setEnabled(enabled);
+        upBtn.setEnabled(enabled);
+        downBtn.setEnabled(enabled);
+        outputSetBtn.setEnabled(enabled);
+        btnOpenFolderOutput.setEnabled(enabled);
+        listDisplay.setEnabled(enabled);
+        btnClearList.setEnabled(enabled);
     }
-
-    // 2. doInBackground(): Ini adalah "MESIN"
-    // Berjalan di BACKGROUND THREAD.
-    // JANGAN sentuh GUI (progressBar, dll) dari sini!
-    @Override
-    protected String doInBackground() throws Exception {
-        try (PDDocument doc = new PDDocument()) {
-            int totalFiles = filesToConvert.size();
-            
-            for (int i = 0; i < totalFiles; i++) {
-                File imageFile = filesToConvert.get(i);
-                
-                // --- Logika PDFBox Anda ---
-                PDImageXObject pdImage = PDImageXObject.createFromFile(imageFile.getAbsolutePath(), doc);
-                PDRectangle pageSize = new PDRectangle(pdImage.getWidth(), pdImage.getHeight());
-                PDPage page = new PDPage(pageSize);
-                doc.addPage(page);
-                
-                try (PDPageContentStream contentStream = new PDPageContentStream(doc, page)) {
-                    contentStream.drawImage(pdImage, 0, 0, pdImage.getWidth(), pdImage.getHeight());
-                }
-                // --- Selesai logika PDFBox ---
-                
-                // 3. KIRIM PROGRESS: Hitung persentase dan kirim ke GUI
-                int progress = (int) (((double) (i + 1) / totalFiles) * 100);
-                publish(progress); // Ini akan memicu method process()
-            }
-            
-            doc.save(outputPath);
-            
-            // 4. KIRIM HASIL: Kirim pesan sukses
-            return "Conversion Success!\nPDF saved in: " + outputPath;
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            // 4. KIRIM HASIL: Kirim pesan error
-            return "Error: An error occured during conversion:\n" + e.getMessage();
-        }
-    }
-
-    // 5. process(): Ini untuk UPDATE GUI
-    // Berjalan di GUI THREAD. Aman sentuh GUI.
-    // Dipanggil setiap kali 'publish()' dieksekusi.
-    @Override
-    protected void process(List<Integer> chunks) {
-        // Ambil progress TERBARU yang dikirim
-        int latestProgress = chunks.get(chunks.size() - 1);
-        progressBar.setValue(latestProgress); // Update JProgressBar
-    }
-
-    // 6. done(): Ini untuk PEMBERSIHAN
-    // Berjalan di GUI THREAD.
-    // Dipanggil SETELAH doInBackground() selesai (baik sukses atau error).
-    @Override
-    protected void done() {
-        try {
-            // 7. Ambil HASIL dari doInBackground()
-            String result = get(); // 'get()' mengambil return value
-            
-            // 8. Tampilkan hasil (sukses atau error)
-            if (result.startsWith("Error:")) {
-                JOptionPane.showMessageDialog(MainFrame.this, result, "Error", JOptionPane.ERROR_MESSAGE);
-            } else {
-                JOptionPane.showMessageDialog(MainFrame.this, result, "Success", JOptionPane.INFORMATION_MESSAGE);
-            }
-            
-        } catch (Exception e) {
-            // Ini menangkap error dari SwingWorker-nya sendiri
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(MainFrame.this, 
-                    "Internal error on worker: " + e.getMessage(), 
-                    "Worker Error", 
-                    JOptionPane.ERROR_MESSAGE);
-        } finally {
-            // 9. BERSIH-BERSIH: APAPUN YANG TERJADI...
-            // Aktifkan lagi semua tombol
-            convertBtn.setEnabled(true);
-            addFileBtn.setEnabled(true);
-            deleteFileBtn.setEnabled(true);
-            upBtn.setEnabled(true);
-            downBtn.setEnabled(true);
-            outputSetBtn.setEnabled(true);
-            listDisplay.setEnabled(true);
-            btnClearList.setEnabled(true);
-            
-            // Reset progress bar
-            progressBar.setValue(0);
-        }
-    }
-}
 }
