@@ -597,5 +597,6 @@ public class MainFrame extends javax.swing.JFrame {
         btnOpenFolderOutput.setEnabled(enabled);
         listDisplay.setEnabled(enabled);
         btnClearList.setEnabled(enabled);
+        cbLossless.setEnabled(enabled);
     }
 }
